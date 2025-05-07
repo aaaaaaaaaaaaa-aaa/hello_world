@@ -182,9 +182,9 @@ def run_recon(domain,run_num,final_file):
     with ThreadPoolExecutor(max_workers=4) as executor:
         futures=[]
         for i in range(1,run_num+1):
-            #futures.append(executor.submit(run_amass,domain,i))
-            #futures.append(executor.submit(run_subfinder,domain,i))
-            #futures.append(executor.submit(run_findomain,domain,i))
+            futures.append(executor.submit(run_amass,domain,i))
+            futures.append(executor.submit(run_subfinder,domain,i))
+            futures.append(executor.submit(run_findomain,domain,i))
             futures.append(executor.submit(run_assetfinder,domain,i))
         for future in futures:
             result=future.result()
