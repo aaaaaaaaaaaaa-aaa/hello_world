@@ -7,7 +7,9 @@ import os
 import time
 import datetime
 import socket
-from concurrent.futures import ThreadPoolExecutor
+import httpx
+import asyncio
+from concurrent.futures import ThreadPoolExecutor,as_completed
 
 output_dir=""
 
@@ -182,9 +184,9 @@ def run_recon(domain,run_num,final_file):
     with ThreadPoolExecutor(max_workers=4) as executor:
         futures=[]
         for i in range(1,run_num+1):
-            futures.append(executor.submit(run_amass,domain,i))
-            futures.append(executor.submit(run_subfinder,domain,i))
-            futures.append(executor.submit(run_findomain,domain,i))
+            #futures.append(executor.submit(run_amass,domain,i))
+            #futures.append(executor.submit(run_subfinder,domain,i))
+            #futures.append(executor.submit(run_findomain,domain,i))
             futures.append(executor.submit(run_assetfinder,domain,i))
         for future in futures:
             result=future.result()
@@ -262,29 +264,47 @@ def run_naabu(final_file):
             ]
     subprocess.run(cmd,check=True)
 
+
 def run_dirsearch(final_file):
     subdomains=[]
-    print("here's run_dirsearch")
+    subdomains_web=[]
     with open(final_file,'r')as f:
         for line in f:
             entry=json.loads(line)
             subdomains.append(entry.get("name",[]))
     subdomains=list(set(subdomains))
-    subdomain_file=os.path.join(output_dir,f"subdomains.txt")
-    with open(subdomain_file,'w') as f:
-        for i in subdomains:
-            f.write(i+'\n')
+    for sd in subdomains:
+        for scheme in ["https","http"]:
+            url=f"{scheme}://{sd}"
+            try:
+                r=httpx.get(url,timeout=3,follow_redirects=True)
+                print(url,r.status_code)
+                subdomains_web.append(url)
+                break
+            except Exception:
+                print(url,"passed")
+
+    def run_dirsearch_on_url(url):
+        try:
+            result=subprocess.run(
+                    ["dirsearch","-u",url,"-e","php,html,txt"],
+                    capture_output=True,
+                    text=True,
+                    timeout=60
+                    )
+            return url,result.stdout
+        except Exception as e:
+            return url,f"Error:{e}"
+
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        futures=[executor.submit(run_dirsearch_on_url,url) for url in subdomains_web]
+        for future in as_completed(futures):
+            url,output=future.result()
+            print(f"[+]results for {url}:\n{output}\n{'-'*50}")
 
 
 
 if __name__ == "__main__":
-    # for naabu testing
-    #start_time=time.time()
-    #final_file="output_20250416172440/final_result_amiya.co.jp.json"
-    #final_file="output_20250416172440/mini.json"
-    #run_naabu(final_file)
-    #print("----- %s seconds ---" %(time.time()-start_time))
-    #sys.exit()
 
 
     if len(sys.argv) != 2:
@@ -301,7 +321,7 @@ if __name__ == "__main__":
     final_file=os.path.join(output_dir,f"final_result_{domain}.json")
     run_num=1
     run_recon(domain,run_num,final_file)
-    run_naabu(final_file)
+    #run_naabu(final_file)
     run_dirsearch(final_file)
 
     end_time=time.time()
