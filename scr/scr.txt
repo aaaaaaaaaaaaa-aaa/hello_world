@@ -1,0 +1,308 @@
+#!/usr/bin/python3
+import subprocess
+import sys
+import datetime
+import json
+import os
+import time
+import datetime
+import socket
+from concurrent.futures import ThreadPoolExecutor
+
+output_dir=""
+
+def resolve_ip(hostname):
+    try:
+        result=subprocess.run(
+                ["dig","+short",hostname],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                text=True,
+                timeout=3
+                )
+        output=result.stdout.strip().splitlines()
+        ips=[line for line in output if line and all(c.isdigit() or c=="." for c in line)]
+        return ips
+    except Exception:
+        return []
+
+
+def run_amass(domain_name,run_id):
+    #timestamp=datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    #output_file=f"amass_{domain_name}_run_{run_id}_{timestamp}.json"
+    #output_file=os.path.join(output_dir,f"amass_{domain_name}_run_{run_id}_{timestamp}.json")
+    output_file=os.path.join(output_dir,f"amass_{domain_name}_run_{run_id}.json")
+    sources=(
+            "arin, abuseipdb, alientvault, alterations, anubisdb, archiveit, arquivo, ask, askdns, bgptools, bgpview, baidu, bing, brute forcing, bufferover , censys, certspotter, cloudflare, commoncrawl, crtsh, dnsdumpster, digitorus, duckduckgo, fullhunt, gists, googlect, greynoise, haw, hackerone, hackertarget, hyperstat, ipv4info, maltiverse, mnemonic, n45ht, networksdb, pkey, radb, rapiddns, riddler, robtex, searchcode, searx, shadowserver, sitedossier, sonarsearch, spyonweb, sublist3rapi, teamcymru, threatcrowd, threatminer, ukwebarchive, urlscan, wayback, yahoo"
+            )
+    cmd=[
+            "/root/asm_tools/amaaaaaas/amass_linux_amd64_v_3_19_2/amass", "enum",
+            "-d", domain_name,
+            "-active",
+            "-brute",
+            "-src",
+            "-ip",
+            "-json", output_file,
+            "-include", sources
+            ]
+    #cmd=[
+    #        "/root/asm_tools/amaaaaaas/amass_linux_amd64_v_3_19_2/amass", "enum",
+    #        "-passive",
+    #        "-d", domain_name,
+    #        "-json", output_file,
+    #        ]
+    print(f"<sys> running amass for {domain_name}")
+    print(f"<sys> output will be saved to {output_file}")
+    subprocess.run(cmd,check=True)
+    return output_file
+
+
+def run_subfinder(domain_name,run_id):
+    #timestamp=datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    #output_file=f"subfinder_{domain_name}_run_{run_id}_{timestamp}.json"
+    #output_file=os.path.join(output_dir,f"subfinder_{domain_name}_run_{run_id}_{timestamp}.json")
+    output_file=os.path.join(output_dir,f"subfinder_{domain_name}_run_{run_id}.json")
+    print("subfinder::::::::::::::::::::::::::::",output_file)
+    cmd=[
+            "/usr/local/bin/subfinder",
+            "-d", domain_name,
+            "-all",
+            "-recursive",
+            "-active",
+            "-ip",
+            "-cs",
+            "-json",
+            "-o", output_file,
+            ]
+    print(f"<sys> running subfinder for {domain_name}")
+    print(f"<sys> output will be saved to {output_file}")
+    subprocess.run(cmd,check=True)
+    return output_file
+
+def run_findomain(domain_name,run_id):
+    #output_file=f"findomain_{domain_name}_run_{run_id}.txt"
+    output_file=os.path.join(output_dir,f"findomain_{domain_name}_run_{run_id}.txt")
+    print("findomain::::::::::::::::::::::::::::",output_file)
+    cmd=["/root/asm_tools/findomainnnnnn/findomain","--ip","-t",domain_name,"-u",output_file]
+    print(f"<sys> running findomain for {domain_name}")
+    subprocess.run(cmd,check=True)
+    return output_file
+
+def run_assetfinder(domain_name,run_id):
+    #output_file=f"assetfinder_{domain_name}_run_{run_id}.txt"
+    output_file=os.path.join(output_dir,f"assetfinder_{domain_name}_run_{run_id}.txt")
+    print("assetfinder::::::::::::::::::::::::::::",output_file)
+    cmd=["/root/asm_tools/assetfinderrrrr/assetfinder",domain_name]
+    print(f"<sys> running assetfinder for {domain_name}")
+    with open(output_file,'w')as f:
+        subprocess.run(cmd,stdout=f,check=True)
+    return output_file
+
+
+def parse_extra_tool(file,domain,source_name):
+    """for findomain and assetfinder, raw txt file to json format"""
+    #print(f"[+] parsing {file} from {source_name}")
+    results=[]
+    with open(file,'r') as f:
+        for line in f:
+            line=line.strip()
+            if not line:
+                continue
+            if ',' in line:
+                name,ip=line.split(',',1)
+                results.append({
+                    "domain":domain,
+                    "name":name,
+                    "addresses":[{"ip":ip.strip()}],
+                    "sources":[source_name]
+                    })
+            else:
+                results.append({
+                    "domain":domain,
+                    "name":line,
+                    "addresses":[],
+                    "sources":[source_name]
+                    })
+    return results
+
+def parse_and_merge(json_files, domain):
+    unique_results = {}
+
+    for file in json_files:
+        print(f"[+] Parsing {file}")
+        with open(file, 'r') as f:
+            for line in f:
+                try:
+                    entry = json.loads(line)
+                    # Normalize the key names for consistency (handle both Amass and Subfinder output formats)
+                    name = entry.get("name") or entry.get("host")  # 'host' is from Subfinder, 'name' is from Amass
+                    ip = entry.get("ip")
+                    source = entry.get("source") or entry.get("sources", [])[0]
+                    
+                    if name and ip:
+                        # If the subdomain is already in the results, log the reason
+                        if name in unique_results:
+                            existing = unique_results[name]
+                            # Log duplication checks for debugging
+                            if ip in [address["ip"] for address in existing["addresses"]]:
+                                print(f"Skipping {name} ({ip}) - already in list")
+                            else:
+                                existing["addresses"].append({"ip": ip})
+                                print(f"Added new IP for {name}: {ip}")
+                            
+                            # Check if the source is new
+                            if source not in existing["sources"]:
+                                existing["sources"].append(source)
+                                print(f"Added new source for {name}: {source}")
+                        else:
+                            # Add the new subdomain if not already in the results
+                            unique_results[name] = {
+                                "domain": domain,
+                                "name": name,
+                                "addresses": [{"ip": ip}],
+                                "sources": [source]
+                            }
+                            #print(f"[+] Adding new subdomain: {name} (IP: {ip}, Source: {source})")
+                except json.JSONDecodeError:
+                    continue
+
+    # Return the merged list of results
+    return list(unique_results.values())
+
+
+def save_merged_output(domain,merged_results,final_file):
+    with open(final_file,'w') as f:
+        for entry in merged_results:
+            f.write(json.dumps(entry)+'\n')
+    print(f" final merged json saved to {final_file}")
+
+def run_recon(domain,run_num,final_file):
+    json_files=[]
+    extra_files=[]
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        futures=[]
+        for i in range(1,run_num+1):
+            #futures.append(executor.submit(run_amass,domain,i))
+            #futures.append(executor.submit(run_subfinder,domain,i))
+            #futures.append(executor.submit(run_findomain,domain,i))
+            futures.append(executor.submit(run_assetfinder,domain,i))
+        for future in futures:
+            result=future.result()
+            if isinstance(result,str) and result.endswith('.json'):
+                json_files.append(result)
+            else:
+                extra_files.append(result)
+
+    print("merging results...")
+    merged_results = parse_and_merge(json_files, domain)
+
+    # Add extra results (Findomain and Assetfinder)
+    merged_names = {r["name"]: r for r in merged_results}
+    for file in extra_files:
+        if "findomain" in file:
+            tool_results = parse_extra_tool(file, domain, "findomain")
+        elif "assetfinder" in file:
+            tool_results = parse_extra_tool(file, domain, "assetfinder")
+
+        for result in tool_results:
+            name = result["name"]
+            ip_list = result.get("addresses", [])
+            source = result["sources"][0]
+
+            if not ip_list:
+                ips=resolve_ip(name)
+                for ip in ips:
+                    result["addresses"].append({"ip":ip})
+                if ips:
+                    result["sources"].append("dig")
+
+
+            if name in merged_names:
+                existing = merged_names[name]
+                for ip_entry in ip_list:
+                    ip = ip_entry.get("ip")
+                    if ip and ip not in [a["ip"] for a in existing["addresses"]]:
+                        existing["addresses"].append({"ip": ip})
+                if source not in existing["sources"]:
+                    existing["sources"].append(source)
+            else:
+                merged_results.append(result)
+                merged_names[name] = result
+
+    save_merged_output(domain, merged_results,final_file)
+
+
+
+def run_naabu(final_file):
+    ips=[]
+    with open(final_file,'r') as f:
+        for line in f:
+            entry=json.loads(line)
+            for addr in entry.get("addresses",[]):
+                ips.append(addr["ip"])
+
+    ips=list(set(ips))
+
+    ip_file=os.path.join(output_dir,f"ips.txt")
+    with open(ip_file, 'w') as f:
+        for i in ips:
+            f.write(i+'\n')
+
+    output_file=os.path.join(output_dir,f"naabu_output.json")
+
+    cmd=[
+            "/root/asm_tools/naabuuuuuu/naabu",
+            "-list", ip_file,
+            "-json", "-o", output_file,
+            "-rate", "2000",
+            "-c", "50",
+            "-retries", "2",
+            "-timeout", "1s",
+            "-scan-type","c",
+            ]
+    subprocess.run(cmd,check=True)
+
+def run_dirsearch(final_file):
+    subdomains=[]
+    print("here's run_dirsearch")
+    with open(final_file,'r')as f:
+        for line in f:
+            entry=json.loads(line)
+            subdomains.append(entry.get("name",[]))
+    subdomains=list(set(subdomains))
+    subdomain_file=os.path.join(output_dir,f"subdomains.txt")
+    with open(subdomain_file,'w') as f:
+        for i in subdomains:
+            f.write(i+'\n')
+
+
+
+if __name__ == "__main__":
+    # for naabu testing
+    #start_time=time.time()
+    #final_file="output_20250416172440/final_result_amiya.co.jp.json"
+    #final_file="output_20250416172440/mini.json"
+    #run_naabu(final_file)
+    #print("----- %s seconds ---" %(time.time()-start_time))
+    #sys.exit()
+
+
+    if len(sys.argv) != 2:
+        print("Usage: ./runner <domain>")
+        sys.exit(1)
+    time_now=datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+
+    domain = sys.argv[1]
+    output_dir="output_"+str(domain).replace('.','_')+'_'+str(time_now)
+    os.makedirs(output_dir,exist_ok=True)
+    print(f"output will be at {output_dir}")
+    start_time=time.time()
+
+    final_file=os.path.join(output_dir,f"final_result_{domain}.json")
+    run_num=1
+    run_recon(domain,run_num,final_file)
+    run_naabu(final_file)
+    run_dirsearch(final_file)
+
+    end_time=time.time()
+    print(f"Execution time: {datetime.timedelta(seconds=end_time-start_time)}")
