@@ -10,6 +10,7 @@ import socket
 import httpx
 import asyncio
 from concurrent.futures import ThreadPoolExecutor,as_completed
+from urllib.parse import urlparse
 
 output_dir=""
 
@@ -284,23 +285,45 @@ def run_dirsearch(final_file):
             except Exception:
                 print(url,"passed")
 
+    print("=======================================")
+    for sd in subdomains_web:
+        print(sd)
+    print("=======================================")
     def run_dirsearch_on_url(url):
         try:
+            print(f"try {url}")
+
+            parsed=urlparse(url)
+            sanitized_netloc=parsed.netloc.replace('.','_')
+            output_file=os.path.join(output_dir,f"{sanitized_netloc}.json")
+
+
+            #output_file=url.replace('.','_')+".json"
+            #output_file=output_file.replace(output_file[:output_file.find("//")+len("//")],"")
+            #output_file=os.path.join(output_dir,output_file)
             result=subprocess.run(
-                    ["dirsearch","-u",url,"-e","php,html,txt"],
-                    capture_output=True,
-                    text=True,
-                    timeout=60
+                    ["dirsearch","-u",url,"-o",output_file,"--format=json","-e","php,html,txt"],
+                    #capture_output=True,
+                    #text=True,
+                    timeout=3600
                     )
-            return url,result.stdout
+            if result.returncode!=0:
+                raise RuntimeError(f"error:{result.stderr.strip()}")
         except Exception as e:
             return url,f"Error:{e}"
+
 
     with ThreadPoolExecutor(max_workers=5) as executor:
         futures=[executor.submit(run_dirsearch_on_url,url) for url in subdomains_web]
         for future in as_completed(futures):
-            url,output=future.result()
-            print(f"[+]results for {url}:\n{output}\n{'-'*50}")
+            url,result=future.result()
+            #print(f"[+]results for {url}:\n{output}\n{'-'*50}")
+            if isinstance(result,str) and result.startswith("Error:"):
+                print(f"[笨余 {url} -> {result}")
+            else:
+                paths=result.get("paths",[])
+                print(f"[笨転 {url} -> {len(paths)} paths found")
+    
 
 
 
@@ -326,3 +349,4 @@ if __name__ == "__main__":
 
     end_time=time.time()
     print(f"Execution time: {datetime.timedelta(seconds=end_time-start_time)}")
+
