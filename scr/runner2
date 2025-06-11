@@ -1,4 +1,3 @@
-#!/usr/bin/python3
 import subprocess
 import sys
 import datetime
@@ -158,7 +157,7 @@ def run_amass(domain_name,can_retry=False):
             "arin, abuseipdb, alientvault, alterations, anubisdb, archiveit, arquivo, ask, askdns, bgptools, bgpview, baidu, bing, brute forcing, bufferover , censys, certspotter, cloudflare, commoncrawl, crtsh, dnsdumpster, digitorus, duckduckgo, fullhunt, gists, googlect, greynoise, haw, hackerone, hackertarget, hyperstat, ipv4info, maltiverse, mnemonic, n45ht, networksdb, pkey, radb, rapiddns, riddler, robtex, searchcode, searx, shadowserver, sitedossier, sonarsearch, spyonweb, sublist3rapi, teamcymru, threatcrowd, threatminer, ukwebarchive, urlscan, wayback, yahoo"
             )
     cmd=[
-            "/root/asm_tools/amaaaaaas/amass_linux_amd64_v_3_19_2/amass", "enum",
+            "amass", "enum",
             "-d", domain_name,
             "-nolocaldb",
             #"-timeout", "30",
@@ -178,7 +177,7 @@ def run_amass(domain_name,can_retry=False):
 
 def run_subfinder(domain_name):
     cmd=[
-            "/usr/local/bin/subfinder",
+            "subfinder",
             "-d", domain_name,
             "-all",
             "-recursive",
@@ -194,14 +193,14 @@ def run_subfinder(domain_name):
 
 
 def run_findomain(domain_name):
-    cmd=["/root/asm_tools/findomainnnnnn/findomain","--ip","-t",domain_name,"-u",findomain_output_file]
+    cmd=["findomain","--ip","-t",domain_name,"-u",findomain_output_file]
     print(f"<sys> running findomain for {domain_name}")
     subprocess.run(cmd,check=True)
     return findomain_output_file
 
 
 def run_assetfinder(domain_name):
-    cmd=["/root/asm_tools/assetfinderrrrr/assetfinder",domain_name]
+    cmd=["assetfinder",domain_name]
     print(f"<sys> running assetfinder for {domain_name}")
     with open(assetfinder_output_file,'w')as f:
         subprocess.run(cmd,stdout=f,check=True)
@@ -298,7 +297,7 @@ if __name__ == "__main__":
     findomain_output_file=os.path.join(TEMP_DIR,f"findomain_{sanitized_domain}.txt")
     assetfinder_output_file=os.path.join(TEMP_DIR,f"assetfinder_{sanitized_domain}.txt")
     final_output_file=os.path.join(f"final_{sanitized_domain}.json")
-    #run_recon(domain)
+    run_recon(domain)
     merge_result()
     end_time=time.time()
     print(f"Execution time: {datetime.timedelta(seconds=end_time-start_time)}")

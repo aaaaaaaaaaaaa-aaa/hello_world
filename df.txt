@@ -1,6 +1,6 @@
 FROM python:3.11-slim
 
-# 基本ツールを導入
+# 蝓ｺ譛ｬ繝・・繝ｫ繧貞ｰ主・
 RUN apt-get update && apt-get install -y curl unzip jq tar && apt-get clean
 
 # amass v3.19.2
@@ -31,12 +31,13 @@ RUN curl -L https://github.com/Findomain/Findomain/releases/download/9.0.4/findo
     && chmod +x /usr/local/bin/findomain \
     && rm -rf findomain.zip findomain_tmp
 
-# Python環境構築
-WORKDIR /app
+# Python迺ｰ蠅・ｧ狗ｯ・WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY scripts/ ./scripts/
 WORKDIR /app/scripts
 
-CMD ["python3", "main.py"]
+ENTRYPOINT ["python3", "main.py"]
+CMD ["example.com"]
+
