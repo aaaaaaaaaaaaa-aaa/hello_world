@@ -1,18 +1,21 @@
 FROM python:3.11-slim
 
-RUN apt-get update && apt-get install -y curl unzip jq && apt-get clean
+# 基本ツールを導入
+RUN apt-get update && apt-get install -y curl unzip jq tar && apt-get clean
 
 # amass v3.19.2
 RUN curl -L https://github.com/owasp-amass/amass/releases/download/v3.19.2/amass_linux_amd64.zip -o amass.zip \
-    && unzip amass.zip -d /usr/local/bin/ \
+    && unzip amass.zip -d amass_tmp \
+    && mv amass_tmp/amass_linux_amd64/amass /usr/local/bin/amass \
     && chmod +x /usr/local/bin/amass \
-    && rm amass.zip
+    && rm -rf amass.zip amass_tmp
 
 # subfinder v2.7.0
 RUN curl -L https://github.com/projectdiscovery/subfinder/releases/download/v2.7.0/subfinder_2.7.0_linux_amd64.zip -o subfinder.zip \
-    && unzip subfinder.zip -d /usr/local/bin/ \
+    && unzip subfinder.zip -d subfinder_tmp \
+    && mv subfinder_tmp/subfinder /usr/local/bin/subfinder \
     && chmod +x /usr/local/bin/subfinder \
-    && rm subfinder.zip
+    && rm -rf subfinder.zip subfinder_tmp
 
 # assetfinder v0.1.1
 RUN curl -L https://github.com/tomnomnom/assetfinder/releases/download/v0.1.1/assetfinder-linux-amd64-0.1.1.tgz -o assetfinder.tgz \
@@ -23,16 +26,12 @@ RUN curl -L https://github.com/tomnomnom/assetfinder/releases/download/v0.1.1/as
 
 # findomain v9.0.4
 RUN curl -L https://github.com/Findomain/Findomain/releases/download/9.0.4/findomain-linux.zip -o findomain.zip \
-    && unzip findomain.zip -d /usr/local/bin/ \
+    && unzip findomain.zip -d findomain_tmp \
+    && mv findomain_tmp/findomain /usr/local/bin/findomain \
     && chmod +x /usr/local/bin/findomain \
-    && rm findomain.zip
+    && rm -rf findomain.zip findomain_tmp
 
-
-
-
-
-
-# Python髢｢騾｣貅門ｙ
+# Python環境構築
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
@@ -41,4 +40,3 @@ COPY scripts/ ./scripts/
 WORKDIR /app/scripts
 
 CMD ["python3", "main.py"]
-
