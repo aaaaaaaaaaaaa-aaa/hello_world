@@ -1,0 +1,304 @@
+#!/usr/bin/python3
+import subprocess
+import sys
+import datetime
+import json
+import os
+import time
+import datetime
+import socket
+import httpx
+import asyncio
+from concurrent.futures import ThreadPoolExecutor,as_completed
+from urllib.parse import urlparse
+from collections import defaultdict
+
+
+service_type_dict = {
+    "DNS": "DNS",
+    "360PassiveDNS": "ASM繝・・繝ｫ",
+    "ARIN": "ASM繝・・繝ｫ",
+    "AbuseIPDB": "繧ｹ繧ｯ繝ｬ繧､繝斐Φ繧ｰ",
+    "Ahrefs": "ASM繝・・繝ｫ",
+    "AlienVault": "ASM繝・・繝ｫ",
+    "alienvault": "ASM繝・・繝ｫ",
+    "Alterations": "螟臥ｨｮ逕滓・",
+    "AnubisDB": "ASM繝・・繝ｫ",
+    "ArchiveIt": "繧ｦ繧ｧ繝悶い繝ｼ繧ｫ繧､繝・,
+    "Arquivo": "繧ｦ繧ｧ繝悶い繝ｼ繧ｫ繧､繝・,
+    "Ask": "繧ｹ繧ｯ繝ｬ繧､繝斐Φ繧ｰ",
+    "AskDNS": "繧ｹ繧ｯ繝ｬ繧､繝斐Φ繧ｰ",
+    "BGPTools": "ASM繝・・繝ｫ",
+    "BGPView": "ASM繝・・繝ｫ",
+    "Baidu": "繧ｹ繧ｯ繝ｬ繧､繝斐Φ繧ｰ",
+    "BinaryEdge": "ASM繝・・繝ｫ",
+    "Bing": "繧ｹ繧ｯ繝ｬ繧､繝斐Φ繧ｰ",
+    "Brute Forcing": "繝悶Ν繝ｼ繝医ヵ繧ｩ繝ｼ繧ｹ",
+    "BufferOver": "ASM繝・・繝ｫ",
+    "BuiltWith": "ASM繝・・繝ｫ",
+    "C99": "ASM繝・・繝ｫ",
+    "CIRCL": "ASM繝・・繝ｫ",
+    "Censys": "險ｼ譏取嶌",
+    "CertSpotter": "險ｼ譏取嶌",
+    "Active Cert": "險ｼ譏取嶌",
+    "Chaos": "ASM繝・・繝ｫ",
+    "Cloudflare": "ASM繝・・繝ｫ",
+    "CommonCrawl": "繧ｦ繧ｧ繝悶け繝ｭ繝ｼ繝ｪ繝ｳ繧ｰ",
+    "Active Crawl": "繧ｦ繧ｧ繝悶け繝ｭ繝ｼ繝ｪ繝ｳ繧ｰ",
+    "Crtsh": "險ｼ譏取嶌",
+    "DNSDB": "ASM繝・・繝ｫ",
+    "DNSDumpster": "繧ｹ繧ｯ繝ｬ繧､繝斐Φ繧ｰ",
+    "DNSRepo": "ASM繝・・繝ｫ",
+    "DNSlytics": "ASM繝・・繝ｫ",
+    "Detectify": "ASM繝・・繝ｫ",
+    "Digitorus": "險ｼ譏取嶌",
+    "DuckDuckGo": "繧ｹ繧ｯ繝ｬ繧､繝斐Φ繧ｰ",
+    "FOFA": "繧ｹ繧ｯ繝ｬ繧､繝斐Φ繧ｰ",
+    "FacebookCT": "險ｼ譏取嶌",
+    "FullHunt": "ASM繝・・繝ｫ",
+    "Gists": "繧ｹ繧ｯ繝ｬ繧､繝斐Φ繧ｰ",
+    "GitHub": "ASM繝・・繝ｫ",
+    "GitLab": "ASM繝・・繝ｫ",
+    "GoogleCT": "險ｼ譏取嶌",
+    "Greynoise": "ASM繝・・繝ｫ",
+    "HAW": "繧ｦ繧ｧ繝悶い繝ｼ繧ｫ繧､繝・,
+    "HackerOne": "繧ｹ繧ｯ繝ｬ繧､繝斐Φ繧ｰ",
+    "HackerTarget": "ASM繝・・繝ｫ",
+    "hackertarget": "ASM繝・・繝ｫ",
+    "Hunter": "ASM繝・・繝ｫ",
+    "HyperStat": "繧ｹ繧ｯ繝ｬ繧､繝斐Φ繧ｰ",
+    "IPdata": "ASM繝・・繝ｫ",
+    "IPinfo": "ASM繝・・繝ｫ",
+    "IPv4Info": "繧ｹ繧ｯ繝ｬ繧､繝斐Φ繧ｰ",
+    "IntelX": "ASM繝・・繝ｫ",
+    "LeakIX": "ASM繝・・繝ｫ",
+    "Maltiverse": "ASM繝・・繝ｫ",
+    "Mnemonic": "ASM繝・・繝ｫ",
+    "N45HT": "ASM繝・・繝ｫ",
+    "NetworksDB": "繧ｹ繧ｯ繝ｬ繧､繝斐Φ繧ｰ",
+    "ONYPHE": "ASM繝・・繝ｫ",
+    "PKey": "繧ｹ繧ｯ繝ｬ繧､繝斐Φ繧ｰ",
+    "PassiveTotal": "ASM繝・・繝ｫ",
+    "PentestTools": "ASM繝・・繝ｫ",
+    "Quake": "ASM繝・・繝ｫ",
+    "RADb": "ASM繝・・繝ｫ",
+    "RapidDNS": "繧ｹ繧ｯ繝ｬ繧､繝斐Φ繧ｰ",
+    "Riddler": "繧ｹ繧ｯ繝ｬ繧､繝斐Φ繧ｰ",
+    "Robtex": "ASM繝・・繝ｫ",
+    "Searchcode": "繧ｹ繧ｯ繝ｬ繧､繝斐Φ繧ｰ",
+    "Searx": "繧ｹ繧ｯ繝ｬ繧､繝斐Φ繧ｰ",
+    "SecurityTrails": "ASM繝・・繝ｫ",
+    "ShadowServer": "縺昴・莉・,
+    "Shodan": "ASM繝・・繝ｫ",
+    "SiteDossier": "繧ｹ繧ｯ繝ｬ繧､繝斐Φ繧ｰ",
+    "SonarSearch": "ASM繝・・繝ｫ",
+    "Spamhaus": "ASM繝・・繝ｫ",
+    "SpyOnWeb": "繧ｹ繧ｯ繝ｬ繧､繝斐Φ繧ｰ",
+    "Spyse": "ASM繝・・繝ｫ",
+    "Sublist3rAPI": "ASM繝・・繝ｫ",
+    "TeamCymru": "縺昴・莉・,
+    "ThreatBook": "ASM繝・・繝ｫ",
+    "ThreatCrowd": "ASM繝・・繝ｫ",
+    "ThreatMiner": "ASM繝・・繝ｫ",
+    "Twitter": "ASM繝・・繝ｫ",
+    "UKWebArchive": "繧ｦ繧ｧ繝悶い繝ｼ繧ｫ繧､繝・,
+    "URLScan": "ASM繝・・繝ｫ",
+    "Umbrella": "ASM繝・・繝ｫ",
+    "VirusTotal": "ASM繝・・繝ｫ",
+    "Wayback": "繧ｦ繧ｧ繝悶い繝ｼ繧ｫ繧､繝・,
+    "WhoisXMLAPI": "ASM繝・・繝ｫ",
+    "Yahoo": "繧ｹ繧ｯ繝ｬ繧､繝斐Φ繧ｰ",
+    "ZETAlytics": "ASM繝・・繝ｫ",
+    "ZoomEye": "ASM繝・・繝ｫ",
+    "BeVigil": "ASM繝・・繝ｫ",
+    "bevigil": "ASM繝・・繝ｫ",
+    "chinaz": "繧ｹ繧ｯ繝ｬ繧､繝斐Φ繧ｰ",
+    "Chinaz": "繧ｹ繧ｯ繝ｬ繧､繝斐Φ繧ｰ",
+    "digitalyama": "ASM繝・・繝ｫ",
+    "DigitalYama": "ASM繝・・繝ｫ",
+    "hudsonrock": "ASM繝・・繝ｫ",
+    "HudsonRock": "ASM繝・・繝ｫ",
+    "netlas": "ASM繝・・繝ｫ",
+    "Netlas": "ASM繝・・繝ｫ",
+    "redhuntlabs": "ASM繝・・繝ｫ",
+    "RedHuntLabs": "ASM繝・・繝ｫ",
+    "sitedossier": "繧ｹ繧ｯ繝ｬ繧､繝斐Φ繧ｰ",
+    "SiteDossier": "繧ｹ繧ｯ繝ｬ繧､繝斐Φ繧ｰ"
+}
+
+
+TEMP_DIR="temp"
+amass_output_file=""
+subfinder_output_file=""
+findomain_output_file=""
+assetfinder_output_file=""
+final_output_file=""
+
+
+
+def resolve_ip(hostname):
+    try:
+        result=subprocess.run(
+                ["dig","+short",hostname],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                text=True,
+                timeout=3
+                )
+        output=result.stdout.strip().splitlines()
+        ips=[line for line in output if line and all(c.isdigit() or c=="." for c in line)]
+        return ips
+    except Exception:
+        return []
+
+
+
+def run_amass(domain_name,can_retry=False):
+    sources=(
+            "arin, abuseipdb, alientvault, alterations, anubisdb, archiveit, arquivo, ask, askdns, bgptools, bgpview, baidu, bing, brute forcing, bufferover , censys, certspotter, cloudflare, commoncrawl, crtsh, dnsdumpster, digitorus, duckduckgo, fullhunt, gists, googlect, greynoise, haw, hackerone, hackertarget, hyperstat, ipv4info, maltiverse, mnemonic, n45ht, networksdb, pkey, radb, rapiddns, riddler, robtex, searchcode, searx, shadowserver, sitedossier, sonarsearch, spyonweb, sublist3rapi, teamcymru, threatcrowd, threatminer, ukwebarchive, urlscan, wayback, yahoo"
+            )
+    cmd=[
+            "/root/asm_tools/amaaaaaas/amass_linux_amd64_v_3_19_2/amass", "enum",
+            "-d", domain_name,
+            "-nolocaldb",
+            #"-timeout", "30",
+            #"-dns-qps", "200",
+            #"-rf", "~/resolvers.txt",
+            "-active",
+            "-brute",
+            "-src",
+            "-ip",
+            "-json", amass_output_file,
+            "-include", sources
+            ]
+    print(f"<sys> running amass for {domain_name}")
+    subprocess.run(cmd,check=True)
+    return amass_output_file
+
+
+def run_subfinder(domain_name):
+    cmd=[
+            "/usr/local/bin/subfinder",
+            "-d", domain_name,
+            "-all",
+            "-recursive",
+            "-active",
+            "-ip",
+            "-cs",
+            "-json",
+            "-o", subfinder_output_file,
+            ]
+    print(f"<sys> running subfinder for {domain_name}")
+    subprocess.run(cmd,check=True)
+    return subfinder_output_file
+
+
+def run_findomain(domain_name):
+    cmd=["/root/asm_tools/findomainnnnnn/findomain","--ip","-t",domain_name,"-u",findomain_output_file]
+    print(f"<sys> running findomain for {domain_name}")
+    subprocess.run(cmd,check=True)
+    return findomain_output_file
+
+
+def run_assetfinder(domain_name):
+    cmd=["/root/asm_tools/assetfinderrrrr/assetfinder",domain_name]
+    print(f"<sys> running assetfinder for {domain_name}")
+    with open(assetfinder_output_file,'w')as f:
+        subprocess.run(cmd,stdout=f,check=True)
+    return assetfinder_output_file
+
+
+def run_recon(domain):
+    json_files=[]
+    extra_files=[]
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        futures=[]
+        futures.append(executor.submit(run_amass,domain))
+        futures.append(executor.submit(run_subfinder,domain))
+        futures.append(executor.submit(run_findomain,domain))
+        futures.append(executor.submit(run_assetfinder,domain))
+        for future in futures:
+            result=future.result()
+            if isinstance(result,str) and result.endswith('.json'):
+                json_files.append(result)
+            else:
+                extra_files.append(result)
+
+
+def merge_result():
+    ip_map=defaultdict(lambda:{"FQDN":set(),"kind":set()})
+    with open(amass_output_file) as f1:
+        for line in f1:
+            data=json.loads(line)
+            fqdn=data["name"]
+            for addr in data.get("addresses",[]):
+                ip=addr["ip"]
+                ip_map[ip]["FQDN"].add(fqdn)
+                #ip_map[ip]["kind"].update(data.get("sources",[]))
+                for src in data.get("sources",[]):
+                    category=service_type_dict.get(src,"UNKNOWN")
+                    ip_map[ip]["kind"].add(category)
+
+    with open(subfinder_output_file) as f2:
+        for line in f2:
+            data=json.loads(line)
+            fqdn=data["host"]
+            ip=data["ip"]
+            ip_map[ip]["FQDN"].add(fqdn)
+            source=data.get("source")
+            sources=data.get("sources")
+            if source:
+                category=service_type_dict.get(source,"UNKNOWN")
+                ip_map[ip]["kind"].add(category)
+            if sources:
+                for src in data.get("sources",[]):
+                    category=service_type_dict.get(src,"UNKNOWN")
+                    ip_map[ip]["kind"].add(category)
+
+    with open(findomain_output_file) as f3:
+        for line in f3:
+            if ',' not in line:
+                continue
+            fqdn,ip=line.strip().split(",")
+            ip_map[ip]["FQDN"].add(fqdn)
+            ip_map[ip]["kind"].add("ASM繝・・繝ｫ")
+
+    with open(assetfinder_output_file) as f4:
+        for line in f4:
+            fqdn=line.strip()
+            ips=resolve_ip(fqdn)
+            for ip in ips:
+                ip_map[ip]["FQDN"].add(fqdn)
+                ip_map[ip]["kind"].add("ASM繝・・繝ｫ")
+                #ip_map[ip]["kind"].add("dig")
+
+    result={
+            ip:{
+                "FQDN":sorted(list(info["FQDN"])),
+                "kind":sorted(list(info["kind"]))
+                }
+            for ip, info in ip_map.items()
+            }
+    with open(final_output_file,"w") as out:
+        json.dump(result,out,indent=2,ensure_ascii=False)
+
+
+
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        print("Usage: ./runner <domain>")
+        sys.exit(1)
+    time_now=datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+    domain = sys.argv[1]
+    sanitized_domain=str(domain).replace('.','_')
+    os.makedirs(TEMP_DIR,exist_ok=True)
+    start_time=time.time()
+    amass_output_file=os.path.join(TEMP_DIR,f"amass_{sanitized_domain}.json")
+    subfinder_output_file=os.path.join(TEMP_DIR,f"subfinder_{sanitized_domain}.json")
+    findomain_output_file=os.path.join(TEMP_DIR,f"findomain_{sanitized_domain}.txt")
+    assetfinder_output_file=os.path.join(TEMP_DIR,f"assetfinder_{sanitized_domain}.txt")
+    final_output_file=os.path.join(f"final_{sanitized_domain}.json")
+    #run_recon(domain)
+    merge_result()
+    end_time=time.time()
+    print(f"Execution time: {datetime.timedelta(seconds=end_time-start_time)}")
